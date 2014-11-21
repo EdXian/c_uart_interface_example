@@ -17,12 +17,12 @@ int serial_set_offboard(int serial_fd)
 
 	com.param1 = 1.0f;				//A number > 0.5f is required here, according to MAV_CMD_NAV_GUIDED_ENABLE docs
 
-	com.target_system = 1;		//Not entirely sure what these are, but the example code uses these so I stuck with them
-	com.target_component = 0;
+	com.target_system = sysid;		//Not entirely sure what these are, but the example code uses these so I stuck with them
+	com.target_component = compid_all;
 
 	com.command = MAV_CMD_NAV_GUIDED_ENABLE;
 
-	mavlink_msg_command_long_encode(200, 0, &msg, &com);
+	mavlink_msg_command_long_encode(sysid, compid_all, &msg, &com);
 
 	unsigned len = mavlink_msg_to_send_buffer((uint8_t*)buf, &msg);
 
@@ -37,7 +37,7 @@ int serial_set_offboard(int serial_fd)
 
 	/* wait until all data has been written */
 	tcdrain(fd);
-	printf("Offboard command sent\n");
+	printf("Set to offboard sent\n");
 	/* Offboard config data sent */
 
 	return 0;
@@ -47,7 +47,7 @@ int program_start(int argc, char **argv)
 {
 
 	/* default values for arguments */
-	char *uart_name = (char*)"/dev/ttyACM0";
+	char *uart_name = (char*)"/dev/ttyUSB0";
 	int baudrate = 57600;
 	const char *commandline_usage = "\tusage: %s -d <devicename> -b <baudrate> [-v/--verbose] [--debug]\n\t\tdefault: -d %s -b %i\n";
 
@@ -162,19 +162,74 @@ int program_start(int argc, char **argv)
 	}
 }
 
+int serial_stream_coords(int serial_fd)
+{
+	int fd = serial_fd;
+
+	mavlink_status_t lastStatus;
+	lastStatus.packet_rx_drop_count = 0;
+
+	unsigned loopcounter = 0;
+
+	char buf[300];
+
+	mavlink_message_t msg;
+	mavlink_set_position_target_local_ned_t pos;
+
+	pos.x = 0.0f;
+	pos.y = 0.0f;
+	pos.z = 1.0f;
+
+	pos.yaw = 0.0f;
+
+	pos.coordinate_frame = MAV_FRAME_LOCAL_NED;
+
+	pos.target_system = sysid;
+	pos.target_component = compid_all;
+
+	mavlink_msg_set_position_target_local_ned_encode(sysid, compid_all, &msg, &pos);
+
+	unsigned len = mavlink_msg_to_send_buffer((uint8_t*)buf, &msg);
+
+	printf("\nSending offboard command...\n");
+	/* write packet via serial link */
+	if(write(fd, buf, len) < 0)
+	{
+		printf("There was a writing error....\n");
+
+		return -1;
+	}
+
+	/* wait until all data has been written */
+	tcdrain(fd);
+	printf("Offboard coord sent\n");
+	/* Offboard config data sent */
+
+	return 0;
+}
+
 int main(int argc, char **argv)
 {
 
-	if(program_start(argc, argv))
+	if(!program_start(argc, argv))
 	{
 		// Run indefinitely while the serial loop handles data
 		if (!silent) printf("\nREADY, sending data.\n");
 
-		//Set to offboard mode
-		serial_set_offboard(fd);
+		while(1)
+		{
+			static int set_offboard_c = 0;
 
-		usleep(250000);
+			/* start streaming the coords before setting to offboard */
+			serial_stream_coords(fd);
 
+			//Set to offboard mode ONCE
+			if(set_offboard_c++ == 0) serial_set_offboard(fd);
+
+			usleep(250000); 	//Ensure frequency < 0.5s
+
+
+		}
 		close_port(fd);
 
 		return 0;
