@@ -43,6 +43,8 @@ int serial_set_offboard(int serial_fd)
 	return 0;
 }
 
+
+
 int program_start(int argc, char **argv)
 {
 
@@ -173,25 +175,25 @@ int serial_stream_coords(int serial_fd)
 
 	char buf[300];
 
-	mavlink_message_t msg;
+	mavlink_message_t pos_msg;
 	mavlink_set_position_target_local_ned_t pos;
+	mavlink_local_position_ned_t cur_pos;
 
-	pos.x = 0.0f;
-	pos.y = 0.0f;
-	pos.z = 1.0f;
-
-	pos.yaw = 0.0f;
+	/* Set coordinates */
+	pos.x =cur_pos.x;
+	pos.y = cur_pos.y;
+	pos.z = -1.0f;		// Set to 1m above the ground (+z points DOWN)
 
 	pos.coordinate_frame = MAV_FRAME_LOCAL_NED;
 
 	pos.target_system = sysid;
 	pos.target_component = compid_all;
 
-	mavlink_msg_set_position_target_local_ned_encode(sysid, compid_all, &msg, &pos);
+	mavlink_msg_set_position_target_local_ned_encode(sysid, compid_all, &pos_msg, &pos);
 
-	unsigned len = mavlink_msg_to_send_buffer((uint8_t*)buf, &msg);
+	unsigned len = mavlink_msg_to_send_buffer((uint8_t*)buf, &pos_msg);
 
-	printf("\nSending offboard command...\n");
+	printf("\nSending coordinate command...\n");
 	/* write packet via serial link */
 	if(write(fd, buf, len) < 0)
 	{
@@ -205,12 +207,41 @@ int serial_stream_coords(int serial_fd)
 	printf("Offboard coord sent\n");
 	/* Offboard config data sent */
 
+	/* Set attitude */
+	mavlink_set_attitude_target_t att;
+	mavlink_attitude_t cur_att;
+	mavlink_message_t att_msg;
+
+	att.thrust = 0.2f;
+	att.body_yaw_rate = 0.1f;
+	att.body_pitch_rate = cur_att.pitchspeed;
+	att.body_roll_rate = cur_att.rollspeed;
+
+	att.target_component = compid_all;
+	att.target_system = sysid;
+
+	mavlink_msg_set_attitude_target_encode(sysid, compid_all, &att_msg, &att);
+	len = mavlink_msg_to_send_buffer((uint8_t*)buf, &att_msg);
+
+	printf("\nSending attitude command...\n");
+	/* write packet via serial link */
+	if(write(fd, buf, len) < 0)
+	{
+		printf("There was a writing error....\n");
+
+		return -1;
+	}
+
+	/* wait until all data has been written */
+	tcdrain(fd);
+	printf("Offboard attitude command sent\n");
+	/* Offboard config data sent */
+
 	return 0;
 }
 
 int main(int argc, char **argv)
 {
-
 	if(!program_start(argc, argv))
 	{
 		// Run indefinitely while the serial loop handles data
@@ -227,8 +258,6 @@ int main(int argc, char **argv)
 			if(set_offboard_c++ == 0) serial_set_offboard(fd);
 
 			usleep(250000); 	//Ensure frequency < 0.5s
-
-
 		}
 		close_port(fd);
 

@@ -1,6 +1,11 @@
 #include "port_setup.h"
 #include "sys_settings.h"
 
+void bye(int i)
+{
+	printf("Hello\n ");
+}
+
 void quit_handler(int sig)
 {
 	printf("Exiting on user request.\n");
