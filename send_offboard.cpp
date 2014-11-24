@@ -180,8 +180,8 @@ int serial_stream_coords(int serial_fd)
 	mavlink_local_position_ned_t cur_pos;
 
 	/* Set coordinates */
-	pos.x =cur_pos.x;
-	pos.y = cur_pos.y;
+	pos.x = 1.0f;
+	pos.y = 1.0f;
 	pos.z = -1.0f;		// Set to 1m above the ground (+z points DOWN)
 
 	pos.coordinate_frame = MAV_FRAME_LOCAL_NED;
@@ -213,12 +213,16 @@ int serial_stream_coords(int serial_fd)
 	mavlink_message_t att_msg;
 
 	att.thrust = 0.2f;
-	att.body_yaw_rate = 0.1f;
-	att.body_pitch_rate = cur_att.pitchspeed;
-	att.body_roll_rate = cur_att.rollspeed;
+
+	att.q[0] = 1.0f;
+	att.q[1] = 0.0f;
+	att.q[2] = 0.0f;
+	att.q[3] = 0.0f;
 
 	att.target_component = compid_all;
 	att.target_system = sysid;
+
+	memset(buf, 0, sizeof(buf));
 
 	mavlink_msg_set_attitude_target_encode(sysid, compid_all, &att_msg, &att);
 	len = mavlink_msg_to_send_buffer((uint8_t*)buf, &att_msg);
