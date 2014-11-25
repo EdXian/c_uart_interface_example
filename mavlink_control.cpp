@@ -20,7 +20,7 @@
 #include "mavlink_control.h"
 #include "system_ids.h"
 
-//printf("hello");
+
 // ------------------------------------------------------------------------------
 //   Main
 // ------------------------------------------------------------------------------
@@ -61,6 +61,9 @@ main(int argc, char **argv)
 		return failure;
 	}
 
+	// Set up CTRL-C quit handling
+	signal(SIGINT, quit_handler);
+
 	printf("\n");
 
 	// --------------------------------------------------------------------------
@@ -71,11 +74,29 @@ main(int argc, char **argv)
 	printf("\n");
 
 	// --------------------------------------------------------------------------
-	//   SEND ONE MESSAGE
+	//   SET TO OFFBOARD MODE
 	// --------------------------------------------------------------------------
-	printf("Write MAVLINK\n");
-	write_message();
-	printf("\n");
+	printf("SETTING TO OFFBOARD\n");
+	write_toggle_offboard(1.0);
+	printf("OFFBOARD ENABLED\n");
+
+	// --------------------------------------------------------------------------
+	//   SEND COORDINATE MESSAGES
+	// --------------------------------------------------------------------------
+	printf("Writing MAVLINK coordinates\n");
+	while(WRITE_FLAG)
+	{
+		write_setpoint();
+		usleep(250000);
+	}
+	printf(" \n");
+
+	// --------------------------------------------------------------------------
+        //   SET FROM OFFBOARD MODE
+        // --------------------------------------------------------------------------
+        printf("SETTING BACK FROM OFFBOARD\n");
+        write_toggle_offboard(0.0);
+        printf("OFFBOARD DISABLED\n");
 
 	// --------------------------------------------------------------------------
 	//   CLOSE PORT
@@ -151,7 +172,7 @@ read_message()
 //   Write Message
 // ------------------------------------------------------------------------------
 int
-write_message()
+write_setpoint()
 {
 
 	// --------------------------------------------------------------------------
@@ -160,8 +181,8 @@ write_message()
 	mavlink_set_position_target_local_ned_t sp;
 	sp.time_boot_ms     = 0;
 	sp.type_mask        = 0;
-	sp.target_system    = 1;
-	sp.target_component = 1;
+	sp.target_system    = sysid;
+	sp.target_component = compid_all;
 	sp.coordinate_frame = MAV_FRAME_LOCAL_NED;
 	sp.x = 0.0f;
 	sp.y = 0.0f;
@@ -179,12 +200,43 @@ write_message()
 	//   ENCODE
 	// --------------------------------------------------------------------------
 	mavlink_message_t message;
-	mavlink_msg_set_position_target_local_ned_encode(sysid, compid, &message, &sp);
+	mavlink_msg_set_position_target_local_ned_encode(sysid, compid_all, &message, &sp);
 
 	// --------------------------------------------------------------------------
 	//   WRITE
 	// --------------------------------------------------------------------------
 	int len = write_serial(message);
+	printf("Sent buffer of length %i\n",len);
+
+	// Done!
+	return 0;
+}
+
+int
+write_toggle_offboard(float sw)
+{
+	// --------------------------------------------------------------------------
+	//   PACK THE COMMAND MESSAGE
+	// --------------------------------------------------------------------------
+        mavlink_command_long_t com;
+
+        com.param1 = sw;                              //A number > 0.5f sets offboard mode, according to MAV_CMD_NAV_GUIDED_ENABLE docs
+
+        com.target_system = sysid;
+        com.target_component = compid_all;
+
+        com.command = MAV_CMD_NAV_GUIDED_ENABLE;
+
+	// --------------------------------------------------------------------------
+	//   ENCODE
+	// --------------------------------------------------------------------------
+        mavlink_message_t message;
+	mavlink_msg_command_long_encode(sysid, compid_all, &message, &com);
+
+	// --------------------------------------------------------------------------
+	//   WRITE
+	// --------------------------------------------------------------------------
+        int len = write_serial(message);
 	printf("Sent buffer of length %i\n",len);
 
 	// Done!
@@ -243,6 +295,12 @@ parse_commandline(int argc, char **argv, char *&uart_name, int &baudrate)
 	return;
 }
 
-
-
+// ------------------------------------------------------------------------------
+// Handle CTRL-C quit signals
+// ------------------------------------------------------------------------------
+void quit_handler(int sig)
+{
+        printf("Exiting on user request.\n");
+        WRITE_FLAG = 0;
+}
 
