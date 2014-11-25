@@ -52,5 +52,3 @@ void close_serial();
 
 int _open_port(const char* port);
 bool _setup_port(int baud, int data_bits, int stop_bits, bool parity, bool hardware_control);
-
-
