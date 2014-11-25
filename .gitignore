@@ -2,3 +2,6 @@
 mavlink_serial
 send_quad_commands
 .DS_Store
+*.a
+*.out
+mavlink_control
