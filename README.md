@@ -10,11 +10,12 @@ Building
 ========
 
 ```
-$ cd c_uart_interface_example/build/
+$ cd c_uart_interface_example/
 $ make
 ```
 
-This example was developed in Eclipse, and a .project file is available in this repository.
+This example was developed in Eclipse, and a .project file is available in this repository. However, you may want to consider using the Makefile from this repository to compile the project.
+
 
 Harware Setup
 =========
@@ -31,7 +32,7 @@ Execution
 -----------------------
 
 ```
-screen /dev/ttyACM0 57600 8N1
+screen /dev/ttyACM0 115200 8N1
 <press enter>
 ```
 
@@ -40,6 +41,14 @@ You have to pick a port name, if the above example doesn't work, try searching f
 $ ls /dev/ttyACM*
 $ ls /dev/ttyUSB*
 ```
+
+Alternatively, plug in Pixhawk USB cable again and issue the
+
+```
+$ dmesg
+```
+command. The device described at the bottom of dmesg's output will be the port on which the Pixhawk is mounted. 
+
 
 2. Start a mavlink session on Pixhawk's USB port
 -----------------------
@@ -56,8 +65,8 @@ Exit screen with the key sequence: ```Ctrl+A , K, Y```
 -----------------------------
 
 ```
-$ cd c_uart_interface_example/build
-$ ./c_uart_interface_example -d /dev/ttyACM0
+$ cd c_uart_interface_example
+$ ./mavlink_control -d /dev/ttyACM0
 ```
 
 Here's an example output
@@ -76,9 +85,17 @@ Got message HIGHRES_IMU (spec: https://pixhawk.ethz.ch/mavlink/#HIGHRES_IMU)
 	 altitude: 	 -39.547714 (m)
 	 temperature: 	 43.639999 C
 
-SEND MAVLINK
+SETTING TO OFFBOARD
+Sent buffer of length 41
+OFFBOARD ENABLED
+Writing MAVLINK coordinates
 Sent buffer of length 61
-
+...
+...
+...
+SETTING BACK FROM OFFBOARD
+Sent buffer of length 41
+OFFBOARD DISABLED
 CLOSE PORT
 Port closed
 ```
@@ -120,7 +137,7 @@ for (ssize_t i = 0; i < nread; i++) {
 
 Screen into the NuttX shell and start a mavlink session like in the example above.  
 
-On the off-board side, in another terminal run the ```c_uart_interface_example``` executable. You should see output in the NuttX shell similar to this:
+On the off-board side, in another terminal run the ```mavlink_control``` executable. You should see output in the NuttX shell similar to this:
 
 ```
 HANDLE MESSAGE
